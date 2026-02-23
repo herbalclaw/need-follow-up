@@ -57,6 +57,18 @@ sudo dnf install jq
 
 Then restart Claude Code.
 
+## Updating
+
+To update to the latest version:
+
+```bash
+/plugin marketplace update lucas-plugins
+/plugin uninstall telegram-notifier
+/plugin install telegram-notifier@lucas-plugins
+```
+
+Then restart Claude Code.
+
 ## Setup
 
 ### 1. Create a Telegram Bot
