@@ -37,12 +37,21 @@ WEBHOOK_SCRIPT="${PLUGIN_DIR}/hooks/webhook-server.sh"
 PENDING_DIR="${HOME}/.claude/telegram-notifier"
 mkdir -p "$PENDING_DIR"
 
+# Debug log
+echo "[Telegram Notifier] Permission request: ${REQUEST_ID}" >> "${PENDING_DIR}/debug.log"
+
 # Auto-start webhook server if not running
 if ! pgrep -f "webhook-server.sh" > /dev/null 2>&1; then
+    echo "[Telegram Notifier] Starting webhook server..." >> "${PENDING_DIR}/debug.log"
     if [ -x "$WEBHOOK_SCRIPT" ]; then
         nohup "$WEBHOOK_SCRIPT" > "${PENDING_DIR}/webhook.log" 2>&1 &
-        sleep 1  # Give it a moment to start
+        sleep 2  # Give it more time to start
+        echo "[Telegram Notifier] Webhook server started" >> "${PENDING_DIR}/debug.log"
+    else
+        echo "[Telegram Notifier] Webhook script not found: $WEBHOOK_SCRIPT" >> "${PENDING_DIR}/debug.log"
     fi
+else
+    echo "[Telegram Notifier] Webhook server already running" >> "${PENDING_DIR}/debug.log"
 fi
 
 # Build detailed notification based on tool type
@@ -100,6 +109,7 @@ _Tap a button below to approve or deny:_"
 ESCAPED_NOTIFICATION=$(echo "$NOTIFICATION" | sed 's/"/\\"/g' | tr '\n' ' ' | sed 's/  */ /g')
 
 # Send notification with inline keyboard for approval
+echo "[Telegram Notifier] Sending Telegram message..." >> "${PENDING_DIR}/debug.log"
 RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
     -H "Content-Type: application/json" \
     -d "{
@@ -116,14 +126,18 @@ RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage
         }
     }")
 
+echo "[Telegram Notifier] Telegram response: $RESPONSE" >> "${PENDING_DIR}/debug.log"
+
 # Check if message was sent successfully
 if [ "$(echo "$RESPONSE" | jq -r '.ok')" != "true" ]; then
-    echo "Failed to send Telegram notification" >&2
+    echo "[Telegram Notifier] Failed to send message" >> "${PENDING_DIR}/debug.log"
     exit 0
 fi
 
 # Wait for user response
 DECISION_FILE="${PENDING_DIR}/${REQUEST_ID}.decision"
+
+echo "[Telegram Notifier] Waiting for decision at: $DECISION_FILE" >> "${PENDING_DIR}/debug.log"
 
 # Wait up to 5 minutes for a decision
 TIMEOUT=300
@@ -133,6 +147,7 @@ while [ $ELAPSED -lt $TIMEOUT ]; do
     if [ -f "$DECISION_FILE" ]; then
         DECISION=$(cat "$DECISION_FILE")
         rm -f "$DECISION_FILE"
+        echo "[Telegram Notifier] Decision received: $DECISION" >> "${PENDING_DIR}/debug.log"
         
         if [ "$DECISION" = "approve" ]; then
             exit 0
@@ -145,6 +160,9 @@ while [ $ELAPSED -lt $TIMEOUT ]; do
     sleep 2
     ELAPSED=$((ELAPSED + 2))
 done
+
+# Timeout
+echo "[Telegram Notifier] Timeout waiting for decision" >> "${PENDING_DIR}/debug.log"
 
 # Timeout - allow the request but notify
 TIMEOUT_NOTIFICATION="⏰ *Approval timed out*
