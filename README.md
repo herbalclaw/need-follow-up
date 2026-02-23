@@ -1,6 +1,6 @@
 # Telegram Notifier for Claude Code
 
-Get Telegram notifications when Claude needs input, approval, or finishes tasks. **Approve or deny requests directly from Telegram!** Never come back from a break to find Claude waiting for you.
+Get Telegram notifications when Claude needs input, approval, or finishes tasks. **Approve or deny requests directly from Telegram!** Works on macOS, Linux, and WSL.
 
 ## Features
 
@@ -9,6 +9,7 @@ Get Telegram notifications when Claude needs input, approval, or finishes tasks.
 - **⚡ Auto-starting webhook** — No manual server setup needed
 - **🤖 Interactive prompts** — Get notified of "press 1 to proceed" type prompts
 - **✅ Task completion** — Know when Claude finishes
+- **🖥️ Cross-platform** — Works on macOS, Linux, and WSL
 
 ## Installation
 
@@ -48,6 +49,15 @@ export TELEGRAM_CHAT_ID="your-chat-id"
 Then restart your terminal or run `source ~/.zshrc` (or `~/.bashrc`).
 
 **That's it!** The webhook server starts automatically when needed.
+
+## Platform Support
+
+| Platform | Status | Notes |
+|----------|--------|-------|
+| macOS | ✅ Fully supported | Tested on Intel and Apple Silicon |
+| Linux | ✅ Fully supported | All distributions |
+| WSL | ✅ Fully supported | WSL1 and WSL2 |
+| Windows (native) | ❌ Not supported | Use WSL instead |
 
 ## How It Works
 
@@ -94,6 +104,7 @@ Your request has been completed. Check the terminal for the full response.
 ### Auto-Starting Webhook Server
 
 The plugin automatically starts a webhook server on first use. It:
+- Uses a PID file for cross-platform process tracking
 - Listens for your Telegram button clicks
 - Records your approve/deny decisions
 - Runs in the background (no manual setup)
@@ -120,9 +131,17 @@ If you don't respond within **5 minutes**, the request is automatically approved
 3. Restart Claude Code after installing the plugin
 
 **Approval buttons not working?**
-1. Check that the webhook server is running: `pgrep -f webhook-server.sh`
+1. Check that the webhook server is running:
+   ```bash
+   cat ~/.claude/telegram-notifier/webhook.pid
+   kill -0 $(cat ~/.claude/telegram-notifier/webhook.pid) 2>/dev/null && echo "Running" || echo "Not running"
+   ```
 2. Check logs: `cat ~/.claude/telegram-notifier/webhook.log`
 3. The server auto-starts on the next permission request
+
+**On WSL specifically:**
+- Make sure you're using WSL2 (recommended): `wsl --set-version <distro> 2`
+- Windows Firewall might block curl - check your firewall settings
 
 **Want to disable completion notifications?**
 ```bash
@@ -136,8 +155,16 @@ export TELEGRAM_NOTIFY_COMPLETION="false"
 | Two-way approval | ✅ Yes | ❌ No |
 | Detailed notifications | ✅ Yes | ✅ Yes |
 | Auto-starting server | ✅ Yes | ❌ Manual |
+| Cross-platform | ✅ macOS/Linux/WSL | ✅ macOS/Linux |
 | No dependencies | ✅ Yes | Requires Bun |
 | Shell scripts | ✅ Yes | TypeScript |
+
+## Development
+
+All hooks are written in pure bash for maximum compatibility:
+- No external dependencies (just `curl`, `jq`, standard Unix tools)
+- PID file-based process management (works on all platforms)
+- POSIX-compliant where possible
 
 ## License
 
