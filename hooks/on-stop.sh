@@ -1,5 +1,5 @@
 #!/bin/bash
-# Hook for Stop events - with project name
+# Hook for Stop events - with project name (no emojis)
 
 INPUT=$(cat)
 
@@ -23,9 +23,9 @@ fi
 
 [ "${TELEGRAM_NOTIFY_COMPLETION:-true}" = "false" ] && exit 0
 
-NOTIFICATION="📁 *${PROJECT_NAME}*
+NOTIFICATION="Project: ${PROJECT_NAME}
 
-✅ *Claude finished*
+Claude finished
 
 Your request has been completed. Check the terminal for details."
 
@@ -33,8 +33,7 @@ curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
     -H "Content-Type: application/json" \
     -d "{
         \"chat_id\": \"${CHAT_ID}\",
-        \"text\": \"${NOTIFICATION}\",
-        \"parse_mode\": \"Markdown\"
+        \"text\": \"${NOTIFICATION}\"
     }" > /dev/null
 
 exit 0

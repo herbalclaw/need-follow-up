@@ -1,5 +1,5 @@
 #!/bin/bash
-# Hook for Notification events - with project name
+# Hook for Notification events - with project name (no emojis)
 
 INPUT=$(cat)
 
@@ -30,40 +30,39 @@ fi
 
 [ -z "$BOT_TOKEN" ] && exit 0
 
-# Build message
+# Build message (no emojis)
 case "$NOTIF_TYPE" in
-    "permission_prompt") EMOJI="⏸️"; HEADER="Claude needs approval" ;;
-    "idle_prompt") EMOJI="🤔"; HEADER="Claude is waiting" ;;
-    "elicitation_dialog") EMOJI="💬"; HEADER="Claude has a question" ;;
-    *) EMOJI="📢"; HEADER="Claude notification" ;;
+    "permission_prompt") HEADER="Claude needs approval" ;;
+    "idle_prompt") HEADER="Claude is waiting" ;;
+    "elicitation_dialog") HEADER="Claude has a question" ;;
+    *) HEADER="Claude notification" ;;
 esac
 
-NOTIFICATION="📁 *${PROJECT_NAME}*
+NOTIFICATION="Project: ${PROJECT_NAME}
 
-${EMOJI} ${HEADER}"
+${HEADER}"
 
 [ -n "$TITLE" ] && NOTIFICATION="${NOTIFICATION}
 
-*${TITLE}*"
+${TITLE}"
 
 if [ -n "$MESSAGE" ]; then
-    ESCAPED_MSG=$(printf '%s' "$MESSAGE" | sed 's/[_*[`]/\\&/g' | head -c 500)
-    [ ${#MESSAGE} -gt 500 ] && ESCAPED_MSG="${ESCAPED_MSG}..."
+    TRIMMED_MSG=$(echo "$MESSAGE" | head -c 500)
+    [ ${#MESSAGE} -gt 500 ] && TRIMMED_MSG="${TRIMMED_MSG}..."
     NOTIFICATION="${NOTIFICATION}
 
-${ESCAPED_MSG}"
+${TRIMMED_MSG}"
 fi
 
 NOTIFICATION="${NOTIFICATION}
 
-⏰ _Check terminal to respond_"
+Check terminal to respond"
 
 curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
     -H "Content-Type: application/json" \
     -d "{
         \"chat_id\": \"${CHAT_ID}\",
-        \"text\": \"${NOTIFICATION}\",
-        \"parse_mode\": \"Markdown\"
+        \"text\": \"${NOTIFICATION}\"
     }" > /dev/null
 
 exit 0

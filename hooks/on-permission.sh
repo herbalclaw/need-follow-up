@@ -1,5 +1,5 @@
 #!/bin/bash
-# Hook for PermissionRequest events - Notification only with project name
+# Hook for PermissionRequest events - Notification only with project name (no emojis for compatibility)
 
 INPUT=$(cat)
 
@@ -26,52 +26,46 @@ fi
 
 [ -z "$BOT_TOKEN" ] && exit 0
 
-# Build message
+# Build message (no emojis for cross-platform compatibility)
 case "$TOOL_NAME" in
     "Bash")
-        EMOJI="💻"
         HEADER="Claude wants to run a command"
         DETAIL="${COMMAND:0:300}"
         [ ${#COMMAND} -gt 300 ] && DETAIL="${DETAIL}..."
         ;;
     "Write")
-        EMOJI="📝"
         HEADER="Claude wants to create a file"
         DETAIL="${FILE_PATH}"
         ;;
     "Edit")
-        EMOJI="✏️"
         HEADER="Claude wants to edit a file"
         DETAIL="${FILE_PATH}"
         ;;
     "Read")
-        EMOJI="👀"
         HEADER="Claude wants to read a file"
         DETAIL="${FILE_PATH}"
         ;;
     *)
-        EMOJI="⚠️"
         HEADER="Claude needs permission"
         DETAIL="${TOOL_NAME}"
         [ -n "$FILE_PATH" ] && DETAIL="${DETAIL}: ${FILE_PATH}"
         ;;
 esac
 
-NOTIFICATION="📁 *${PROJECT_NAME}*
+NOTIFICATION="Project: ${PROJECT_NAME}
 
-${EMOJI} ${HEADER}
+${HEADER}
 
 ${DETAIL}
 
-⏰ _Go to terminal to approve_"
+Go to terminal to approve"
 
-# Send notification
+# Send notification (no parse_mode to avoid markdown issues)
 curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
     -H "Content-Type: application/json" \
     -d "{
         \"chat_id\": \"${CHAT_ID}\",
-        \"text\": \"${NOTIFICATION}\",
-        \"parse_mode\": \"Markdown\"
+        \"text\": \"${NOTIFICATION}\"
     }" > /dev/null
 
 exit 0
