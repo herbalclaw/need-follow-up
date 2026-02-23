@@ -1,5 +1,5 @@
 #!/bin/bash
-# Hook for PermissionRequest events - WSL compatible
+# Hook for PermissionRequest events - Cross-platform (WSL, macOS, Linux)
 
 # Read JSON input from stdin
 INPUT=$(cat)
@@ -12,49 +12,63 @@ DESCRIPTION=$(echo "$INPUT" | jq -r '.description // ""')
 FILE_PATH=$(echo "$TOOL_INPUT" | jq -r '.file_path // .path // ""')
 COMMAND=$(echo "$TOOL_INPUT" | jq -r '.command // ""')
 
-# Load config
+# Load config from environment or settings
 BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
 CHAT_ID="${TELEGRAM_CHAT_ID:-}"
 
 if [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ]; then
-    CONFIG_FILE="$HOME/.claude/settings.json"
-    if [ -f "$CONFIG_FILE" ]; then
-        BOT_TOKEN=$(jq -r '.plugins[] | select(.name == "telegram-notifier") | .config.botToken' "$CONFIG_FILE" 2>/dev/null)
-        CHAT_ID=$(jq -r '.plugins[] | select(.name == "telegram-notifier") | .config.chatId' "$CONFIG_FILE" 2>/dev/null)
-    fi
+    # Try settings.json
+    for CONFIG_FILE in "$HOME/.claude/settings.json" "$HOME/.claude-code/config.json"; do
+        if [ -f "$CONFIG_FILE" ]; then
+            BOT_TOKEN=$(jq -r '.plugins[]? | select(.name == "telegram-notifier") | .config.botToken' "$CONFIG_FILE" 2>/dev/null)
+            CHAT_ID=$(jq -r '.plugins[]? | select(.name == "telegram-notifier") | .config.chatId' "$CONFIG_FILE" 2>/dev/null)
+            [ -n "$BOT_TOKEN" ] && [ -n "$CHAT_ID" ] && break
+        fi
+    done
 fi
 
+# Exit if no config
 if [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ]; then
     exit 0
 fi
 
-# Setup directories
-PLUGIN_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-WEBHOOK_SCRIPT="${PLUGIN_DIR}/hooks/webhook-server.sh"
+# Setup paths
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+WEBHOOK_SCRIPT="${SCRIPT_DIR}/webhook-server.sh"
 PENDING_DIR="${HOME}/.claude/telegram-notifier"
-mkdir -p "$PENDING_DIR"
 PID_FILE="${PENDING_DIR}/webhook.pid"
 
-# WSL-friendly server check and start
-if [ -f "$PID_FILE" ]; then
-    OLD_PID=$(cat "$PID_FILE" 2>/dev/null)
-    if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
-        : # Server is running
-    else
-        # PID file stale, remove it
-        rm -f "$PID_FILE"
-        # Start server
-        if [ -x "$WEBHOOK_SCRIPT" ]; then
-            bash "$WEBHOOK_SCRIPT" > "${PENDING_DIR}/webhook.log" 2>&1 &
-            sleep 2
-        fi
-    fi
-else
-    # No PID file, start server
+mkdir -p "$PENDING_DIR"
+
+# Cross-platform server check and start
+start_server() {
     if [ -x "$WEBHOOK_SCRIPT" ]; then
-        bash "$WEBHOOK_SCRIPT" > "${PENDING_DIR}/webhook.log" 2>&1 &
+        # Start in background, detached from terminal
+        ( "$WEBHOOK_SCRIPT" > "${PENDING_DIR}/webhook.log" 2>&1 ) &
         sleep 2
     fi
+}
+
+# Check if server is running
+NEED_START=false
+if [ -f "$PID_FILE" ]; then
+    OLD_PID=$(cat "$PID_FILE" 2>/dev/null)
+    if [ -n "$OLD_PID" ]; then
+        # Cross-platform process check
+        if ! kill -0 "$OLD_PID" 2>/dev/null; then
+            NEED_START=true
+        fi
+    else
+        NEED_START=true
+    fi
+else
+    NEED_START=true
+fi
+
+# Start if needed
+if [ "$NEED_START" = true ]; then
+    rm -f "$PID_FILE"
+    start_server
 fi
 
 # Build notification message
@@ -98,16 +112,17 @@ NOTIFICATION="${EMOJI} *${HEADER}*
 
 ${DETAIL}
 
-_Tap a button below:_"
+_Tap a button:_"
 
-ESCAPED_NOTIFICATION=$(echo "$NOTIFICATION" | sed 's/"/\\"/g' | tr '\n' ' ' | sed 's/  */ /g')
+# Escape for JSON
+ESCAPED=$(printf '%s' "$NOTIFICATION" | sed 's/"/\\"/g' | tr '\n' ' ' | sed 's/  */ /g')
 
-# Send notification
+# Send notification with buttons
 RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
     -H "Content-Type: application/json" \
     -d "{
         \"chat_id\": \"${CHAT_ID}\",
-        \"text\": \"${ESCAPED_NOTIFICATION}\",
+        \"text\": \"${ESCAPED}\",
         \"parse_mode\": \"Markdown\",
         \"reply_markup\": {
             \"inline_keyboard\": [
@@ -119,26 +134,32 @@ RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage
         }
     }")
 
-[ "$(echo "$RESPONSE" | jq -r '.ok')" != "true" ] && exit 0
+# Check if sent successfully
+if [ "$(echo "$RESPONSE" | jq -r '.ok')" != "true" ]; then
+    exit 0
+fi
 
-# Wait for decision
+# Wait for user decision
 DECISION_FILE="${PENDING_DIR}/${REQUEST_ID}.decision"
-TIMEOUT=300
+TIMEOUT=300  # 5 minutes
 ELAPSED=0
 
 while [ $ELAPSED -lt $TIMEOUT ]; do
     if [ -f "$DECISION_FILE" ]; then
-        DECISION=$(cat "$DECISION_FILE")
+        DECISION=$(cat "$DECISION_FILE" 2>/dev/null)
         rm -f "$DECISION_FILE"
-        [ "$DECISION" = "approve" ] && exit 0
-        echo "Request denied by user via Telegram" >&2
-        exit 1
+        if [ "$DECISION" = "approve" ]; then
+            exit 0
+        else
+            echo "Request denied by user via Telegram" >&2
+            exit 1
+        fi
     fi
     sleep 2
     ELAPSED=$((ELAPSED + 2))
 done
 
-# Timeout - notify and allow
+# Timeout - notify and proceed
 curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
     -H "Content-Type: application/json" \
     -d "{

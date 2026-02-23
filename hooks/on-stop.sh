@@ -1,51 +1,36 @@
 #!/bin/bash
-# Hook for Stop events - notifies when Claude finishes responding
+# Hook for Stop events - Cross-platform
 
-# Read JSON input from stdin
 INPUT=$(cat)
 
-# Load config
 BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
 CHAT_ID="${TELEGRAM_CHAT_ID:-}"
 
-# Try new path first (~/.claude/)
 if [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ]; then
-    CONFIG_FILE="$HOME/.claude/settings.json"
-    if [ -f "$CONFIG_FILE" ]; then
-        BOT_TOKEN=$(jq -r '.plugins[] | select(.name == "telegram-notifier") | .config.botToken' "$CONFIG_FILE" 2>/dev/null)
-        CHAT_ID=$(jq -r '.plugins[] | select(.name == "telegram-notifier") | .config.chatId' "$CONFIG_FILE" 2>/dev/null)
-    fi
+    for CONFIG_FILE in "$HOME/.claude/settings.json" "$HOME/.claude-code/config.json"; do
+        if [ -f "$CONFIG_FILE" ]; then
+            BOT_TOKEN=$(jq -r '.plugins[]? | select(.name == "telegram-notifier") | .config.botToken' "$CONFIG_FILE" 2>/dev/null)
+            CHAT_ID=$(jq -r '.plugins[]? | select(.name == "telegram-notifier") | .config.chatId' "$CONFIG_FILE" 2>/dev/null)
+            [ -n "$BOT_TOKEN" ] && [ -n "$CHAT_ID" ] && break
+        fi
+    done
 fi
 
-# Try old path as fallback
-if [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ]; then
-    CONFIG_FILE="$HOME/.claude-code/config.json"
-    if [ -f "$CONFIG_FILE" ]; then
-        BOT_TOKEN=$(jq -r '.plugins[] | select(.name == "telegram-notifier") | .config.botToken' "$CONFIG_FILE" 2>/dev/null)
-        CHAT_ID=$(jq -r '.plugins[] | select(.name == "telegram-notifier") | .config.chatId' "$CONFIG_FILE" 2>/dev/null)
-    fi
-fi
+[ -z "$BOT_TOKEN" ] && exit 0
 
-if [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ]; then
-    exit 0
-fi
+[ "${TELEGRAM_NOTIFY_COMPLETION:-true}" = "false" ] && exit 0
 
-# Check if user wants completion notifications
-NOTIFY_COMPLETION="${TELEGRAM_NOTIFY_COMPLETION:-true}"
-if [ "$NOTIFY_COMPLETION" = "false" ]; then
-    exit 0
-fi
-
-# Send completion notification
 NOTIFICATION="✅ *Claude finished*
 
-Your request has been completed. Check the terminal for the full response."
+Your request has been completed. Check the terminal for details."
+
+ESCAPED=$(printf '%s' "$NOTIFICATION" | sed 's/"/\\"/g')
 
 curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
     -H "Content-Type: application/json" \
     -d "{
         \"chat_id\": \"${CHAT_ID}\",
-        \"text\": \"${NOTIFICATION}\",
+        \"text\": \"${ESCAPED}\",
         \"parse_mode\": \"Markdown\"
     }" > /dev/null
 
