@@ -1,19 +1,31 @@
 # Telegram Notifier for Claude Code
 
-Get Telegram notifications when Claude needs input, approval, or finishes tasks. **Approve or deny requests directly from Telegram!** Works on macOS, Linux, and WSL.
+Get Telegram notifications when Claude needs approval or finishes tasks. Never come back from a break to find Claude waiting for you!
 
 ## Features
 
-- **🔥 Two-way approval** — Approve or deny requests directly from Telegram with inline buttons
-- **📱 Detailed notifications** — See exactly what Claude wants to do (commands, files, etc.)
-- **⚡ Auto-starting webhook** — No manual server setup needed
-- **🤖 Interactive prompts** — Get notified of "press 1 to proceed" type prompts
+- **📱 Instant notifications** — Get pinged on Telegram when Claude needs approval
+- **🔍 Detailed context** — See exactly what Claude wants to do (commands, files, etc.)
 - **✅ Task completion** — Know when Claude finishes
 - **🖥️ Cross-platform** — Works on macOS, Linux, and WSL
 
+## What It Does
+
+When Claude needs permission (file edits, bash commands, etc.), you get a Telegram message like:
+
+```
+💻 Claude wants to run a command
+
+npm install some-package
+
+⏰ Go to terminal to approve
+```
+
+You still approve in the terminal — but now you **know** when to come back!
+
 ## Prerequisites
 
-You need `jq` installed for JSON parsing:
+You need `jq` installed:
 
 **Ubuntu/Debian/WSL:**
 ```bash
@@ -67,80 +79,43 @@ export TELEGRAM_CHAT_ID="your-chat-id"
 
 Then restart your terminal or run `source ~/.zshrc` (or `~/.bashrc`).
 
-**That's it!** The webhook server starts automatically when needed.
-
 ## Platform Support
 
-| Platform | Status | Notes |
-|----------|--------|-------|
-| macOS | ✅ Fully supported | Tested on Intel and Apple Silicon |
-| Linux | ✅ Fully supported | All distributions |
-| WSL | ✅ Fully supported | WSL1 and WSL2 |
-| Windows (native) | ❌ Not supported | Use WSL instead |
+| Platform | Status |
+|----------|--------|
+| macOS | ✅ Supported |
+| Linux | ✅ Supported |
+| WSL | ✅ Supported |
 
-## How It Works
+## Notification Types
 
-### Two-Way Approval from Telegram 🔥
-
-When Claude needs permission, you get a message like this:
-
+**Permission Required:**
 ```
 💻 Claude wants to run a command
 
-Command:
-```
 npm install some-package
+
+⏰ Go to terminal to approve
 ```
 
-Tap a button below to approve or deny:
-[✅ Approve] [❌ Deny]
-```
-
-Just tap **Approve** or **Deny** in Telegram — Claude will proceed immediately!
-
-### Detailed Notifications
-
-The plugin shows exactly what Claude wants to do:
-
-| Action | Emoji | Details Shown |
-|--------|-------|---------------|
-| Bash command | 💻 | The actual command |
-| Write file | 📝 | File path |
-| Edit file | ✏️ | File path |
-| Read file | 👀 | File path |
-| Other | ⚠️ | Action type |
-
-### Task Completion
-
+**Task Complete:**
 ```
 ✅ Claude finished
 
-Your request has been completed. Check the terminal for the full response.
+Your request has been completed. Check the terminal for details.
 ```
 
-## Technical Details
+## How It Works
 
-### Auto-Starting Webhook Server
+The plugin uses Claude Code's hook system:
 
-The plugin automatically starts a webhook server on first use. It:
-- Uses a PID file for cross-platform process tracking
-- Listens for your Telegram button clicks
-- Records your approve/deny decisions
-- Runs in the background (no manual setup)
+| Hook | When It Fires |
+|------|---------------|
+| `PermissionRequest` | Before file edits, bash commands, etc. |
+| `Notification` | Permission prompts, idle prompts |
+| `Stop` | When Claude finishes responding |
 
-Server logs: `~/.claude/telegram-notifier/webhook.log`
-
-### Timeout Behavior
-
-If you don't respond within **5 minutes**, the request is automatically approved and you get a timeout notification.
-
-### Hooks Used
-
-| Hook | Purpose |
-|------|---------|
-| `PermissionRequest` | File edits, bash commands, etc. |
-| `Notification` | Permission prompts, idle prompts, questions |
-| `Stop` | Task completion |
+**Note:** Claude Code's PermissionRequest hook is **notification-only** — it can tell you something is waiting, but you still need to go back to the terminal to approve/deny. This plugin ensures you know when to come back!
 
 ## Troubleshooting
 
@@ -149,41 +124,10 @@ If you don't respond within **5 minutes**, the request is automatically approved
 2. Make sure you sent `/start` to your bot on Telegram
 3. Restart Claude Code after installing the plugin
 
-**Approval buttons not working?**
-1. Check that the webhook server is running:
-   ```bash
-   cat ~/.claude/telegram-notifier/webhook.pid
-   kill -0 $(cat ~/.claude/telegram-notifier/webhook.pid) 2>/dev/null && echo "Running" || echo "Not running"
-   ```
-2. Check logs: `cat ~/.claude/telegram-notifier/webhook.log`
-3. The server auto-starts on the next permission request
-
-**On WSL specifically:**
-- Make sure you're using WSL2 (recommended): `wsl --set-version <distro> 2`
-- Windows Firewall might block curl - check your firewall settings
-
 **Want to disable completion notifications?**
 ```bash
 export TELEGRAM_NOTIFY_COMPLETION="false"
 ```
-
-## Comparison with Other Plugins
-
-| Feature | This Plugin | agent-reachout |
-|---------|-------------|----------------|
-| Two-way approval | ✅ Yes | ❌ No |
-| Detailed notifications | ✅ Yes | ✅ Yes |
-| Auto-starting server | ✅ Yes | ❌ Manual |
-| Cross-platform | ✅ macOS/Linux/WSL | ✅ macOS/Linux |
-| No dependencies | ✅ Yes | Requires Bun |
-| Shell scripts | ✅ Yes | TypeScript |
-
-## Development
-
-All hooks are written in pure bash for maximum compatibility:
-- No external dependencies (just `curl`, `jq`, standard Unix tools)
-- PID file-based process management (works on all platforms)
-- POSIX-compliant where possible
 
 ## License
 
