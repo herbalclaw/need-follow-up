@@ -11,6 +11,25 @@ Get Telegram notifications when Claude needs input, approval, or finishes tasks.
 - **✅ Task completion** — Know when Claude finishes
 - **🖥️ Cross-platform** — Works on macOS, Linux, and WSL
 
+## Prerequisites
+
+You need `jq` installed for JSON parsing:
+
+**Ubuntu/Debian/WSL:**
+```bash
+sudo apt-get install -y jq
+```
+
+**macOS:**
+```bash
+brew install jq
+```
+
+**Fedora/RHEL:**
+```bash
+sudo dnf install jq
+```
+
 ## Installation
 
 ```bash
