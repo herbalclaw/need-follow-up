@@ -25,10 +25,8 @@ fi
 [ -z "$BOT_TOKEN" ] && exit 0
 
 # Setup
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PENDING_DIR="${HOME}/.claude/telegram-notifier"
 DECISION_FILE="${PENDING_DIR}/${REQUEST_ID}.decision"
-
 mkdir -p "$PENDING_DIR"
 
 # Build message
@@ -36,54 +34,59 @@ case "$TOOL_NAME" in
     "Bash")
         EMOJI="💻"
         HEADER="Claude wants to run a command"
-        DETAIL="\`\`\`\n${COMMAND:0:300}\n\`\`\`"
+        DETAIL="${COMMAND:0:300}"
         [ ${#COMMAND} -gt 300 ] && DETAIL="${DETAIL}..."
         ;;
     "Write")
         EMOJI="📝"
         HEADER="Claude wants to create a file"
-        DETAIL="📄 ${FILE_PATH}"
+        DETAIL="${FILE_PATH}"
         ;;
     "Edit")
         EMOJI="✏️"
         HEADER="Claude wants to edit a file"
-        DETAIL="📄 ${FILE_PATH}"
+        DETAIL="${FILE_PATH}"
         ;;
     "Read")
         EMOJI="👀"
         HEADER="Claude wants to read a file"
-        DETAIL="📄 ${FILE_PATH}"
+        DETAIL="${FILE_PATH}"
         ;;
     *)
         EMOJI="⚠️"
         HEADER="Claude needs permission"
-        DETAIL="Action: ${TOOL_NAME}"
-        [ -n "$FILE_PATH" ] && DETAIL="${DETAIL} - ${FILE_PATH}"
+        DETAIL="${TOOL_NAME}"
+        [ -n "$FILE_PATH" ] && DETAIL="${DETAIL}: ${FILE_PATH}"
         ;;
 esac
 
-NOTIFICATION="${EMOJI} *${HEADER}*
+# Create JSON payload using jq for proper escaping
+PAYLOAD=$(jq -n \
+    --arg chat_id "$CHAT_ID" \
+    --arg text "$EMOJI $HEADER
 
-${DETAIL}
+$DETAIL
 
-_Tap to approve/deny:_"
-
-# Send with inline keyboard
-curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
-    -H "Content-Type: application/json" \
-    -d "{
-        \"chat_id\": \"${CHAT_ID}\",
-        \"text\": \"${NOTIFICATION}\",
-        \"parse_mode\": \"Markdown\",
-        \"reply_markup\": {
-            \"inline_keyboard\": [[
-                {\"text\": \"✅ Approve\", \"callback_data\": \"approve:${REQUEST_ID}\"},
-                {\"text\": \"❌ Deny\", \"callback_data\": \"deny:${REQUEST_ID}\"}
+Tap to approve:" \
+    --arg req_id "$REQUEST_ID" \
+    '{
+        chat_id: $chat_id,
+        text: $text,
+        parse_mode: "Markdown",
+        reply_markup: {
+            inline_keyboard: [[
+                {text: "✅ Approve", callback_data: "approve:\($req_id)"},
+                {text: "❌ Deny", callback_data: "deny:\($req_id)"}
             ]]
         }
-    }" > /dev/null
+    }')
 
-# Wait for decision (check file)
+# Send message
+curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+    -H "Content-Type: application/json" \
+    -d "$PAYLOAD" > /dev/null
+
+# Wait for decision
 TIMEOUT=300
 ELAPSED=0
 
@@ -99,9 +102,9 @@ while [ $ELAPSED -lt $TIMEOUT ]; do
     ELAPSED=$((ELAPSED + 2))
 done
 
-# Timeout - proceed
+# Timeout
 curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
     -H "Content-Type: application/json" \
-    -d "{\"chat_id\": \"${CHAT_ID}\", \"text\": \"⏰ Timed out - proceeding\", \"parse_mode\": \"Markdown\"}" > /dev/null
+    -d "{\"chat_id\": \"${CHAT_ID}\", \"text\": \"⏰ Timed out\", \"parse_mode\": \"Markdown\"}" > /dev/null
 
 exit 0
