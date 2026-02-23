@@ -13,12 +13,22 @@ TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty')
 BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
 CHAT_ID="${TELEGRAM_CHAT_ID:-}"
 
-# If not in env, try to load from Claude Code config
+# If not in env, try to load from Claude Code config (check both paths)
 if [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ]; then
-    CONFIG_FILE="$HOME/.claude-code/config.json"
+    # Try new path first (~/.claude/)
+    CONFIG_FILE="$HOME/.claude/settings.json"
     if [ -f "$CONFIG_FILE" ]; then
         BOT_TOKEN=$(jq -r '.plugins[] | select(.name == "telegram-notifier") | .config.botToken' "$CONFIG_FILE" 2>/dev/null)
         CHAT_ID=$(jq -r '.plugins[] | select(.name == "telegram-notifier") | .config.chatId' "$CONFIG_FILE" 2>/dev/null)
+    fi
+    
+    # Try old path as fallback
+    if [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ]; then
+        CONFIG_FILE="$HOME/.claude-code/config.json"
+        if [ -f "$CONFIG_FILE" ]; then
+            BOT_TOKEN=$(jq -r '.plugins[] | select(.name == "telegram-notifier") | .config.botToken' "$CONFIG_FILE" 2>/dev/null)
+            CHAT_ID=$(jq -r '.plugins[] | select(.name == "telegram-notifier") | .config.chatId' "$CONFIG_FILE" 2>/dev/null)
+        fi
     fi
 fi
 

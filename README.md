@@ -36,7 +36,7 @@ Get Telegram notifications when Claude needs input, approval, or finishes tasks.
 
 ### 3. Configure the Plugin
 
-Add to your `~/.claude-code/config.json`:
+Add to your `~/.claude/settings.json`:
 
 ```json
 {
@@ -61,6 +61,11 @@ export TELEGRAM_NOTIFY_COMPLETION="true"  # optional
 ```
 
 Then restart Claude Code.
+
+**Note:** The plugin checks for config in this order:
+1. Environment variables (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`)
+2. `~/.claude/settings.json` (new Claude Code path)
+3. `~/.claude-code/config.json` (legacy path)
 
 ## Notifications You'll Receive
 
