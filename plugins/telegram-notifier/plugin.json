@@ -1,7 +1,7 @@
 {
   "name": "telegram-notifier",
   "version": "1.0.0",
-  "description": "Get Telegram notifications when Claude needs approval or finishes tasks",
+  "description": "Get Telegram notifications when Claude needs approval, asks questions, or finishes tasks",
   "author": {
     "name": "Lucas",
     "email": ""
@@ -9,10 +9,39 @@
   "license": "MIT",
   "homepage": "https://github.com/herbalclaw/need-follow-up",
   "repository": "https://github.com/herbalclaw/need-follow-up",
-  "keywords": ["telegram", "notifications", "approval", "mobile"],
+  "keywords": ["telegram", "notifications", "approval", "mobile", "alerts"],
   "hooks": {
-    "onApprovalRequired": "./dist/hooks/onApproval.js",
-    "onTaskComplete": "./dist/hooks/onComplete.js",
-    "onThinkingStart": "./dist/hooks/onThinking.js"
+    "PermissionRequest": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./hooks/on-permission.sh"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "permission_prompt|idle_prompt|elicitation_dialog",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./hooks/on-notification.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./hooks/on-stop.sh"
+          }
+        ]
+      }
+    ]
   }
 }

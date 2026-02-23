@@ -1,6 +1,14 @@
 # Telegram Notifier for Claude Code
 
-Get Telegram notifications when Claude needs approval or finishes tasks. Never come back from a break to find Claude waiting for you to type "yes"!
+Get Telegram notifications when Claude needs input, approval, or finishes tasks. Never come back from a break to find Claude waiting for you to press "1" or type "yes"!
+
+## What It Handles
+
+- **Permission requests** — File edits, bash commands, etc.
+- **Interactive prompts** — "Press 1 to proceed", "Enter your choice", etc.
+- **Questions** — When Claude needs clarification
+- **Idle prompts** — When Claude is waiting for you
+- **Task completion** — When Claude finishes responding
 
 ## Installation
 
@@ -37,115 +45,82 @@ Add to your `~/.claude-code/config.json`:
       "name": "telegram-notifier",
       "config": {
         "botToken": "YOUR_BOT_TOKEN",
-        "chatId": "YOUR_CHAT_ID",
-        "notifyOnApproval": true,
-        "notifyOnCompletion": true,
-        "notifyOnLongThinking": true,
-        "longThinkingThresholdMinutes": 5,
-        "includeContext": true
+        "chatId": "YOUR_CHAT_ID"
       }
     }
   ]
 }
 ```
 
-Or use environment variables:
+Or use environment variables (quickest for testing):
 
 ```bash
 export TELEGRAM_BOT_TOKEN="your-bot-token"
 export TELEGRAM_CHAT_ID="your-chat-id"
-export TELEGRAM_NOTIFY_APPROVAL="true"
-export TELEGRAM_NOTIFY_COMPLETION="true"
+export TELEGRAM_NOTIFY_COMPLETION="true"  # optional
 ```
 
-## Configuration Options
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `botToken` | string | (required) | Your Telegram bot token from BotFather |
-| `chatId` | string | (required) | Your Telegram chat ID |
-| `notifyOnApproval` | boolean | `true` | Send notification when approval is needed |
-| `notifyOnCompletion` | boolean | `true` | Send notification when task completes |
-| `notifyOnLongThinking` | boolean | `true` | Send notification when thinking exceeds threshold |
-| `longThinkingThresholdMinutes` | number | `5` | Minutes before "long thinking" notification |
-| `includeContext` | boolean | `true` | Include task context in notifications |
-| `quietHoursStart` | string | `null` | Start of quiet hours (24h format, e.g., "22:00") |
-| `quietHoursEnd` | string | `null` | End of quiet hours (e.g., "08:00") |
+Then restart Claude Code.
 
 ## Notifications You'll Receive
 
-**Approval Needed:**
+**Permission Required:**
 ```
 ⏸️ Claude needs approval
 
-Task: "Refactor the authentication module"
-
-Action: `Delete file src/auth/old.ts`
-
-Claude wants to remove the deprecated auth module.
-
-Reply with: ✅ yes | ❌ no
+Claude wants to edit src/config.ts
+Allow this edit?
 ```
 
-**Task Completed:**
+**Interactive Prompt (e.g., "press 1 to proceed"):**
 ```
-✅ Task Complete
+💬 Claude has a question
 
-Task: "Refactor the authentication module"
+Multiple options available:
+1. Proceed with option A
+2. Proceed with option B
+3. Cancel
 
-Duration: 12 min
-Files changed: 5
-
-_Migrated auth to new JWT-based system..._
-```
-
-**Long Thinking Check-in:**
-```
-🤔 Still working...
-
-Task: "Analyze the codebase"
-
-Claude has been thinking for 8 minutes. Everything is proceeding normally.
+Enter your choice:
 ```
 
-## Quiet Hours
+**Idle/Waiting:**
+```
+🤔 Claude is waiting
 
-Don't want notifications at night? Set quiet hours:
-
-```json
-{
-  "quietHoursStart": "22:00",
-  "quietHoursEnd": "08:00"
-}
+Waiting for your input to continue...
 ```
 
-Notifications will be suppressed during these hours.
+**Task Complete:**
+```
+✅ Claude finished
+
+Your request has been completed. Check the terminal for the full response.
+```
 
 ## How It Works
 
-The plugin uses Claude Code's hook system:
+The plugin uses Claude Code's native hook system:
 
-- **`onApprovalRequired`** — Triggered when Claude needs permission
-- **`onTaskComplete`** — Triggered when a prompt finishes
-- **`onThinkingStart`** — Triggered during long-running tasks
+| Hook | When It Fires |
+|------|---------------|
+| `PermissionRequest` | Before file edits, bash commands, etc. |
+| `Notification` | Permission prompts, idle prompts, questions |
+| `Stop` | When Claude finishes responding |
 
-Each hook sends a Telegram message via the Bot API.
+Each hook sends a Telegram message so you know when to come back to your terminal.
 
-## Development
+## Troubleshooting
 
+**Not receiving notifications?**
+1. Check that `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are set
+2. Make sure you sent `/start` to your bot on Telegram
+3. Restart Claude Code after installing the plugin
+4. Check Claude Code's logs for hook errors
+
+**Want to disable completion notifications?**
 ```bash
-# Clone the repo
-git clone https://github.com/herbalclaw/need-follow-up.git
-cd need-follow-up
-
-# Install dependencies
-npm install
-
-# Build
-npm run build
-
-# Watch mode
-npm run dev
+export TELEGRAM_NOTIFY_COMPLETION="false"
 ```
 
 ## License
