@@ -1,6 +1,6 @@
 #!/bin/bash
 # Hook for PermissionRequest events - sends detailed Telegram notification with approval buttons
-# Waits for user response from Telegram
+# Auto-starts webhook server if not running
 
 # Read JSON input from stdin
 INPUT=$(cat)
@@ -14,8 +14,6 @@ DESCRIPTION=$(echo "$INPUT" | jq -r '.description // ""')
 # Extract specific tool input details
 FILE_PATH=$(echo "$TOOL_INPUT" | jq -r '.file_path // .path // ""')
 COMMAND=$(echo "$TOOL_INPUT" | jq -r '.command // ""')
-OLD_STRING=$(echo "$TOOL_INPUT" | jq -r '.old_string // ""')
-NEW_STRING=$(echo "$TOOL_INPUT" | jq -r '.new_string // ""')
 
 # Load config
 BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
@@ -30,8 +28,21 @@ if [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ]; then
 fi
 
 if [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ]; then
-    # No config, just allow the request
     exit 0
+fi
+
+# Get the plugin directory
+PLUGIN_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+WEBHOOK_SCRIPT="${PLUGIN_DIR}/hooks/webhook-server.sh"
+PENDING_DIR="${HOME}/.claude/telegram-notifier"
+mkdir -p "$PENDING_DIR"
+
+# Auto-start webhook server if not running
+if ! pgrep -f "webhook-server.sh" > /dev/null 2>&1; then
+    if [ -x "$WEBHOOK_SCRIPT" ]; then
+        nohup "$WEBHOOK_SCRIPT" > "${PENDING_DIR}/webhook.log" 2>&1 &
+        sleep 1  # Give it a moment to start
+    fi
 fi
 
 # Build detailed notification based on tool type
@@ -108,17 +119,14 @@ RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage
 # Check if message was sent successfully
 if [ "$(echo "$RESPONSE" | jq -r '.ok')" != "true" ]; then
     echo "Failed to send Telegram notification" >&2
-    # Allow the request if we can't notify
     exit 0
 fi
 
-# Wait for user response (check for decision file)
-PENDING_DIR="${HOME}/.claude/telegram-notifier"
-mkdir -p "$PENDING_DIR"
+# Wait for user response
 DECISION_FILE="${PENDING_DIR}/${REQUEST_ID}.decision"
 
 # Wait up to 5 minutes for a decision
-TIMEOUT=300  # 5 minutes in seconds
+TIMEOUT=300
 ELAPSED=0
 
 while [ $ELAPSED -lt $TIMEOUT ]; do
@@ -127,10 +135,8 @@ while [ $ELAPSED -lt $TIMEOUT ]; do
         rm -f "$DECISION_FILE"
         
         if [ "$DECISION" = "approve" ]; then
-            # Return success to allow the request
             exit 0
         else
-            # Return error to deny the request
             echo "Request denied by user via Telegram" >&2
             exit 1
         fi
@@ -154,5 +160,4 @@ curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
         \"parse_mode\": \"Markdown\"
     }" > /dev/null
 
-# Allow on timeout
 exit 0
