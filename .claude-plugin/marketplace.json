@@ -11,7 +11,10 @@
   "plugins": [
     {
       "name": "telegram-notifier",
-      "source": ".",
+      "source": {
+        "source": "github",
+        "repo": "herbalclaw/need-follow-up"
+      },
       "description": "Get Telegram notifications when Claude needs approval or finishes tasks",
       "version": "1.0.0",
       "author": {
