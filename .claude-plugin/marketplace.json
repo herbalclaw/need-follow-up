@@ -11,7 +11,7 @@
   "plugins": [
     {
       "name": "telegram-notifier",
-      "source": "./plugins/telegram-notifier",
+      "source": ".",
       "description": "Get Telegram notifications when Claude needs approval or finishes tasks",
       "version": "1.0.0",
       "author": {
