@@ -95,9 +95,6 @@ export TELEGRAM_CHAT_ID="your-chat-id"
 **Optional settings:**
 
 ```bash
-# Disable emojis (for WSL or terminals that don't support them)
-export TELEGRAM_USE_EMOJIS="false"
-
 # Disable completion notifications
 export TELEGRAM_NOTIFY_COMPLETION="false"
 ```
@@ -170,16 +167,6 @@ The **project name** is determined from the current working directory (`$PWD`) w
 1. Check that `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are set
 2. Make sure you sent `/start` to your bot on Telegram
 3. Restart Claude Code after installing the plugin
-
-**Emojis not showing?**
-
-Some terminals (especially WSL on Windows) don't render emojis properly. Disable them:
-
-```bash
-export TELEGRAM_USE_EMOJIS="false"
-```
-
-With emojis disabled, messages use text labels like `[CMD]`, `[WRITE]`, `[PROJECT]` instead.
 
 ## License
 
