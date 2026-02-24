@@ -32,11 +32,11 @@ ${DONE_EMOJI} Claude finished
 
 Your request has been completed. Check the terminal for details."
 
-curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
-    -H "Content-Type: application/json" \
-    -d "{
-        \"chat_id\": \"${CHAT_ID}\",
-        \"text\": \"${NOTIFICATION}\"
-    }" > /dev/null
+# Send notification (use jq to properly encode Unicode/emojis)
+jq -n --arg chat_id "$CHAT_ID" --arg text "$NOTIFICATION" \
+    '{chat_id: $chat_id, text: $text}' | \
+    curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+        -H "Content-Type: application/json" \
+        -d @- > /dev/null
 
 exit 0
