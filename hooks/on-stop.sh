@@ -23,19 +23,15 @@ fi
 
 [ "${TELEGRAM_NOTIFY_COMPLETION:-true}" = "false" ] && exit 0
 
-FOLDER_EMOJI="📁"
-DONE_EMOJI="✅"
-
-NOTIFICATION="${FOLDER_EMOJI} ${PROJECT_NAME}
-
-${DONE_EMOJI} Claude finished
-
-Your request has been completed. Check the terminal for details."
-
-# Send notification (use jq to properly encode Unicode/emojis)
-PAYLOAD=$(jq -n --arg chat_id "$CHAT_ID" --arg text "$NOTIFICATION" '{chat_id: $chat_id, text: $text}')
-curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
-    -H "Content-Type: application/json" \
-    -d "$PAYLOAD" > /dev/null
+# Send via Python for proper Unicode/emoji support
+python -c "
+import urllib.request, json, sys
+msg = f\"\U0001F4C1 {sys.argv[1]}\n\n\u2705 Claude finished\n\nYour request has been completed. Check the terminal for details.\"
+url = 'https://api.telegram.org/bot' + sys.argv[2] + '/sendMessage'
+data = json.dumps({'chat_id': sys.argv[3], 'text': msg}).encode()
+req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
+try: urllib.request.urlopen(req, timeout=5)
+except: pass
+" "$PROJECT_NAME" "$BOT_TOKEN" "$CHAT_ID"
 
 exit 0

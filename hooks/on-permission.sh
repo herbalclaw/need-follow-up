@@ -26,31 +26,14 @@ fi
 
 [ -z "$BOT_TOKEN" ] && exit 0
 
-# Build message
+# Build header based on tool
 case "$TOOL_NAME" in
-    "Bash")
-        EMOJI="💻"
-        HEADER="Claude wants to run a command"
-        ;;
-    "Write")
-        EMOJI="📝"
-        HEADER="Claude wants to create a file"
-        ;;
-    "Edit")
-        EMOJI="✏️"
-        HEADER="Claude wants to edit a file"
-        ;;
-    "Read")
-        EMOJI="👀"
-        HEADER="Claude wants to read a file"
-        ;;
-    *)
-        EMOJI="⚠️"
-        HEADER="Claude needs permission"
-        ;;
+    "Bash") EMOJI_KEY="computer"; HEADER="Claude wants to run a command" ;;
+    "Write") EMOJI_KEY="memo"; HEADER="Claude wants to create a file" ;;
+    "Edit") EMOJI_KEY="pencil"; HEADER="Claude wants to edit a file" ;;
+    "Read") EMOJI_KEY="eyes"; HEADER="Claude wants to read a file" ;;
+    *) EMOJI_KEY="warning"; HEADER="Claude needs permission" ;;
 esac
-FOLDER_EMOJI="📁"
-TIME_EMOJI="⏰"
 
 # Build detail
 case "$TOOL_NAME" in
@@ -63,18 +46,17 @@ case "$TOOL_NAME" in
         ;;
 esac
 
-NOTIFICATION="${FOLDER_EMOJI} ${PROJECT_NAME}
-
-${EMOJI} ${HEADER}
-
-${DETAIL}
-
-${TIME_EMOJI} Go to terminal to approve"
-
-# Send notification (use jq to properly encode Unicode/emojis)
-PAYLOAD=$(jq -n --arg chat_id "$CHAT_ID" --arg text "$NOTIFICATION" '{chat_id: $chat_id, text: $text}')
-curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
-    -H "Content-Type: application/json" \
-    -d "$PAYLOAD" > /dev/null
+# Send via Python for proper Unicode/emoji support
+python -c "
+import urllib.request, json, sys
+emojis = {'computer':'\U0001F4BB','memo':'\U0001F4DD','pencil':'\u270F\uFE0F','eyes':'\U0001F440','warning':'\u26A0\uFE0F','folder':'\U0001F4C1','clock':'\u23F0'}
+e = emojis.get(sys.argv[1], '\u26A0\uFE0F')
+msg = f\"{emojis['folder']} {sys.argv[2]}\n\n{e} {sys.argv[3]}\n\n{sys.argv[4]}\n\n{emojis['clock']} Go to terminal to approve\"
+url = 'https://api.telegram.org/bot' + sys.argv[5] + '/sendMessage'
+data = json.dumps({'chat_id': sys.argv[6], 'text': msg}).encode()
+req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
+try: urllib.request.urlopen(req, timeout=5)
+except: pass
+" "$EMOJI_KEY" "$PROJECT_NAME" "$HEADER" "$DETAIL" "$BOT_TOKEN" "$CHAT_ID"
 
 exit 0

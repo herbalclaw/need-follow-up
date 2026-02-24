@@ -30,39 +30,35 @@ fi
 
 [ -z "$BOT_TOKEN" ] && exit 0
 
-# Build message
+# Build header based on notification type
 case "$NOTIF_TYPE" in
-    "permission_prompt") EMOJI="⏸️"; HEADER="Claude needs approval" ;;
-    "idle_prompt") EMOJI="🤔"; HEADER="Claude is waiting" ;;
-    "elicitation_dialog") EMOJI="💬"; HEADER="Claude has a question" ;;
-    *) EMOJI="📢"; HEADER="Claude notification" ;;
+    "permission_prompt") EMOJI_KEY="pause"; HEADER="Claude needs approval" ;;
+    "idle_prompt") EMOJI_KEY="thinking"; HEADER="Claude is waiting" ;;
+    "elicitation_dialog") EMOJI_KEY="speech"; HEADER="Claude has a question" ;;
+    *) EMOJI_KEY="megaphone"; HEADER="Claude notification" ;;
 esac
-FOLDER_EMOJI="📁"
 
-NOTIFICATION="${FOLDER_EMOJI} ${PROJECT_NAME}
-
-${EMOJI} ${HEADER}"
-
-[ -n "$TITLE" ] && NOTIFICATION="${NOTIFICATION}
-
-${TITLE}"
-
+# Trim message
+TRIMMED_MSG=""
 if [ -n "$MESSAGE" ]; then
     TRIMMED_MSG=$(echo "$MESSAGE" | head -c 500)
     [ ${#MESSAGE} -gt 500 ] && TRIMMED_MSG="${TRIMMED_MSG}..."
-    NOTIFICATION="${NOTIFICATION}
-
-${TRIMMED_MSG}"
 fi
 
-NOTIFICATION="${NOTIFICATION}
-
-Check terminal to respond"
-
-# Send notification (use jq to properly encode Unicode/emojis)
-PAYLOAD=$(jq -n --arg chat_id "$CHAT_ID" --arg text "$NOTIFICATION" '{chat_id: $chat_id, text: $text}')
-curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
-    -H "Content-Type: application/json" \
-    -d "$PAYLOAD" > /dev/null
+# Send via Python for proper Unicode/emoji support
+python -c "
+import urllib.request, json, sys
+emojis = {'pause':'\u23F8\uFE0F','thinking':'\U0001F914','speech':'\U0001F4AC','megaphone':'\U0001F4E2','folder':'\U0001F4C1'}
+e = emojis.get(sys.argv[1], '\U0001F4E2')
+msg = f\"{emojis['folder']} {sys.argv[2]}\n\n{e} {sys.argv[3]}\"
+if sys.argv[4]: msg += f\"\n\n{sys.argv[4]}\"
+if sys.argv[5]: msg += f\"\n\n{sys.argv[5]}\"
+msg += '\n\nCheck terminal to respond'
+url = 'https://api.telegram.org/bot' + sys.argv[6] + '/sendMessage'
+data = json.dumps({'chat_id': sys.argv[7], 'text': msg}).encode()
+req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
+try: urllib.request.urlopen(req, timeout=5)
+except: pass
+" "$EMOJI_KEY" "$PROJECT_NAME" "$HEADER" "$TITLE" "$TRIMMED_MSG" "$BOT_TOKEN" "$CHAT_ID"
 
 exit 0
